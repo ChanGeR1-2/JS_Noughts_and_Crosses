@@ -35,8 +35,8 @@ body * {
 
 .board {
     margin-top: 50px;
-    height: 400px;
-    width: 400px;
+    max-height: 400px;
+    max-width: 400px;
     display: grid;
     grid-template: repeat(3, minmax(100px, 1fr)) / repeat(3, minmax(100px, 1fr));
     gap: 10px;
@@ -80,7 +80,7 @@ body * {
 }
 
 .game-over-screen {
-    height: 200px;
+    height: 280px;
     width: 300px;
     border: 0;
     background-color: transparent;
