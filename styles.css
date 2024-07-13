@@ -80,6 +80,7 @@ body * {
 }
 
 .game-over-screen {
+    height: 200px;
     width: 300px;
     border: 0;
     background-color: transparent;

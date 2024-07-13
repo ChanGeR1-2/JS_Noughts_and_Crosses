@@ -19,7 +19,10 @@ const createPlayer = function(type, symbol) {
     const getSymbol = function() {
         return symbol;
     }
-    return {getType, getSymbol};
+    const setSymbol = function(sym) {
+        symbol = sym;
+    }
+    return {getType, getSymbol, setSymbol};
 };
 
 const board = (function() {
@@ -161,23 +164,23 @@ const board = (function() {
 })();
 
 const createComputer = function(type, symbol) {
-    const {getType, getSymbol} = createPlayer(type, symbol);
+    const {getType, getSymbol, setSymbol} = createPlayer(type, symbol);
 
     const findBestMove = function() {
         const tiles = board.copyBoard();
         const moves = board.getAvailableMoves(tiles);
         const scores = new Map();
         for (let {row, col} of moves) {
-            tiles[row][col].setSymbol(symbol);
-            const eval = minimax(tiles, -1000000, 1000000, symbol, false);
+            tiles[row][col].setSymbol(getSymbol());
+            const eval = minimax(tiles, -1000000, 1000000, getSymbol(), false);
             tiles[row][col].reset();
             scores.set({row, col}, eval);
         }
-        console.log(scores);
         let bestScore = -100;
         let bestMove;
         for (let [key, value] of scores) {
-            if (value > bestScore) {
+            const randomChance = Math.random();
+            if (value > bestScore || (value >= bestScore && randomChance > 0.5)) {
                 bestScore = value;
                 bestMove = key;
             }
@@ -189,7 +192,7 @@ const createComputer = function(type, symbol) {
         if (board.checkWin(sym, tiles)) {
             const {row, col} = board.getWinningLine()[0];
             const winningSymbol = tiles[row][col].getSymbol();
-            if (winningSymbol === symbol) {
+            if (winningSymbol === getSymbol()) {
                 return 10;
             } else {
                 return -10;
@@ -208,8 +211,8 @@ const createComputer = function(type, symbol) {
         if (isMax) {
             let bestEval = -10000;
             for (let {row, col} of moves) {
-                tiles[row][col].setSymbol(symbol);
-                const eval = minimax(tiles, alpha, beta, symbol, false);
+                tiles[row][col].setSymbol(getSymbol());
+                const eval = minimax(tiles, alpha, beta, getSymbol(), false);
                 tiles[row][col].reset();
                 bestEval = Math.max(bestEval, eval);
                 alpha = Math.max(alpha, eval);
@@ -221,7 +224,7 @@ const createComputer = function(type, symbol) {
         } else {
             let bestEval = 10000;
             for (let {row, col} of moves) {
-                const newSymbol = symbol === 'X' ? 'O' : 'X';
+                const newSymbol = getSymbol() === 'X' ? 'O' : 'X';
                 tiles[row][col].setSymbol(newSymbol);
                 const eval = minimax(tiles, alpha, beta, newSymbol, true);
                 tiles[row][col].reset();
@@ -235,7 +238,7 @@ const createComputer = function(type, symbol) {
         }
     }
 
-    return {getType, getSymbol, findBestMove};
+    return {getType, getSymbol, setSymbol, findBestMove};
 };
 
 const dialogOpenOver = new CustomEvent('gameOver')
@@ -302,11 +305,20 @@ const gameController = (function () {
         }
         currentPlayer = players[0];
         gameIsOver = false;
+        if (currentPlayer.getType() === "computer") {
+            const {row, col} = currentPlayer.findBestMove();
+            cellNodes[(row * 3) + col].click();
+        }
     }
 
-    const setPlayers = function(player1, player2) {
-        players[0] = player1;
-        players[1] = player2;
+    const switchPlayers = function() {
+        const tmp = players[0];
+        players[0] = players[1];
+        players[1] = tmp;
+        players[0].setSymbol('X');
+        players[1].setSymbol('O');
+        board.reset();
+        reset();
     }
 
     const getWinner = function() {
@@ -326,7 +338,7 @@ const gameController = (function () {
         document.dispatchEvent(dialogOpenOver);
     }
 
-    return {reset, setPlayers, getWinner};
+    return {reset, switchPlayers, getWinner};
 })();
 
 const gameOverScreen = document.querySelector('.game-over-screen');
@@ -337,6 +349,10 @@ document.addEventListener('gameOver', () => {
     gameOverScreen.inert = true;
     gameOverScreen.showModal();
     gameOverScreen.inert = false;
+})
+
+document.querySelector('.switch-player').addEventListener('click', () => {
+    gameController.switchPlayers();
 })
 
 gameOverScreen.addEventListener('click', () => {
