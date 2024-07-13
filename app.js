@@ -43,7 +43,7 @@ const board = (function() {
         board[row][col].setSymbol(symbol);
     }
 
-    const checkWin = function(tiles, symbol) {
+    const checkWin = function(symbol, tiles = board) {
         let cells = [];
         for (let i = 0; i < 3; i++) {
             let count = 0;
@@ -112,7 +112,7 @@ const board = (function() {
         return false;
     }
 
-    const checkTie  = function(tiles) {
+    const checkTie  = function(tiles = board) {
         for (let i = 0; i < 3; i++) {
             for (let j = 0; j < 3; j++) {
                 if (tiles[i][j].getSymbol() === 'EMPTY') {
@@ -131,7 +131,7 @@ const board = (function() {
         return winningLine;
     }
 
-    const getAvailableMoves = function(tiles) {
+    const getAvailableMoves = function(tiles = board) {
         const moves = [];
         for (let i = 0; i < 3; i++) {
             for (let j = 0; j < 3; j++) {
@@ -186,7 +186,7 @@ const createComputer = function(type, symbol) {
     }
 
     function getScore(tiles, sym) {
-        if (board.checkWin(tiles, sym)) {
+        if (board.checkWin(sym, tiles)) {
             const {row, col} = board.getWinningLine()[0];
             const winningSymbol = tiles[row][col].getSymbol();
             if (winningSymbol === symbol) {
@@ -202,7 +202,7 @@ const createComputer = function(type, symbol) {
     function minimax(tiles, alpha, beta, sym, isMax) {
         const score = getScore(tiles, sym);
         const moves = board.getAvailableMoves(tiles);
-        if (board.checkWin(tiles, sym) || board.checkTie(tiles) || moves.length === 0) {
+        if (board.checkWin(sym, tiles) || board.checkTie(tiles) || moves.length === 0) {
             return score;
         }
         if (isMax) {
@@ -238,6 +238,7 @@ const createComputer = function(type, symbol) {
     return {getType, getSymbol, findBestMove};
 };
 
+const dialogOpenOver = new CustomEvent('gameOver')
 
 const gameController = (function () {
     const cellNodes = document.querySelectorAll('.cell');
@@ -255,16 +256,39 @@ const gameController = (function () {
         cell.addEventListener('click', () => {
             if (board.isValid(row, col) && !gameIsOver) {
                 board.setCell(row, col, currentPlayer.getSymbol());
-                cell.textContent = currentPlayer.getSymbol();
-                if (board.checkWin(board.copyBoard(), currentPlayer.getSymbol())) {
+                if (board.checkTie()) {
+                    document.dispatchEvent(dialogOpenOver);
+                }
+                if (cell.children[0]) {
+                    cell.removeChild(cell.firstChild);
+                }
+                const span = document.createElement('span');
+                span.textContent = currentPlayer.getSymbol();
+                cell.appendChild(span);
+                if (board.checkWin(currentPlayer.getSymbol())) {
                     handleWin();
+                } else {
+                    currentPlayer = currentPlayer === players[0] ? players[1] : players[0];
+                    const type = currentPlayer.getType();
+                    if (type === 'computer' && !board.checkTie()) {
+                        const {row, col} = currentPlayer.findBestMove();
+                        cellNodes[(row * 3) + col].click();
+                    }
                 }
-                currentPlayer = currentPlayer === players[0] ? players[1] : players[0];
-                const type = currentPlayer.getType();
-                if (type === 'computer' && !board.checkTie(board.copyBoard())) {
-                    const {row, col} = currentPlayer.findBestMove();
-                    cellNodes[(row * 3) + col].click();
-                }
+            }
+        });
+        cell.addEventListener('mouseenter', () => {
+            if (cell.children.length === 0) {
+                const span = document.createElement('span');
+                span.textContent = currentPlayer.getSymbol();
+                span.classList.add('transparent-text');
+                cell.appendChild(span);
+            }
+        })
+        cell.addEventListener('mouseleave', () => {
+            const span = cell.children[0];
+            if (span.classList.contains('transparent-text')) {
+                cell.removeChild(span);
             }
         })
     }
@@ -285,6 +309,13 @@ const gameController = (function () {
         players[1] = player2;
     }
 
+    const getWinner = function() {
+        if (gameIsOver) {
+            return currentPlayer;
+        }
+        return null;
+    }
+
     function handleWin() {
         const winningLine = board.getWinningLine();
         gameIsOver = true;
@@ -292,10 +323,27 @@ const gameController = (function () {
         for (let {row, col} of winningLine) {
             cellNodes[(row * 3) + col].classList.toggle('green');
         }
+        document.dispatchEvent(dialogOpenOver);
     }
 
-    return {reset, setPlayers};
+    return {reset, setPlayers, getWinner};
 })();
+
+const gameOverScreen = document.querySelector('.game-over-screen');
+const gameOverScreenText = document.querySelector('.game-over-screen div');
+document.addEventListener('gameOver', () => {
+    const winner = gameController.getWinner();
+    gameOverScreenText.textContent = `${winner ? winner.getSymbol() + ' wins!' : 'Draw!'}`;
+    gameOverScreen.inert = true;
+    gameOverScreen.showModal();
+    gameOverScreen.inert = false;
+})
+
+gameOverScreen.addEventListener('click', () => {
+    gameOverScreen.close();
+    board.reset();
+    gameController.reset();
+})
 
 document.querySelector('.reset-button').addEventListener('click', () => {
     board.reset();
